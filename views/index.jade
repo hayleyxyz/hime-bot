@@ -1,0 +1,21 @@
+extends layout
+
+block content
+    header#header
+        .ui.page.grid
+            .column
+                .ui.inverted.main.menu
+                    a.item(href='/')= title
+
+    .ui.page.grid
+        .column
+            h1 Logs
+
+            .ui.items
+                each message in messages
+                    .ui.item.message
+                        .meta
+                            span.author= message.author_name
+                            span.timestamp= message.timestamp
+
+                        .body= message.content

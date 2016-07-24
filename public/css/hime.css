@@ -1,0 +1,17 @@
+#header {
+    background: #1b1c1d;
+    margin-bottom: 1rem;
+    z-index: 101;
+    margin: 0 0 1rem;
+    border: none;
+    width: 100%;
+    position: relative;
+}
+
+#header .ui.grid .column {
+    padding-bottom: 0px;
+}
+
+#header .ui.main.menu .item {
+    border-radius: 0px;
+}
