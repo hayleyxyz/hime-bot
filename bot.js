@@ -14,7 +14,7 @@ function Command(trigger) {
     this.trigger = trigger;
     this.params = [ ];
     this.handler = null;
-    this.protected = false;
+    this.requiresAdmin = false;
 
     this.param = function(name, options) {
         options = options || { };
@@ -32,8 +32,8 @@ function Command(trigger) {
     };
 
     this.admin = function() {
-        this.protected = true;
-*
+        this.requiresAdmin = true;
+
         return this;
     };
 
@@ -88,49 +88,71 @@ function HimeBot(token) {
 
         scope.dispatchMessageCommand = function(message) {
             if(message.content.charAt(0) === scope.prefix) {
-                for(var i in scope.commands) {
+                scope.commands.forEach(function(command) {
                     var args = [ message ];
                     var parts = message.content.split(' ');
-                    var command = scope.commands[i];
                     var trigger = parts.shift().substr(1);
 
                     if(trigger === command.trigger) {
+                        if(command.requiresAdmin) {
+                            models.ServerAdminRole.where('server_id', message.channel.guild.id).fetchAll().then(function(rows) {
+                                for(var i in rows.models) {
+                                    var model = rows.models[i];
+                                    var roleId = null;
 
-                        if(command.protected) {
-                            // TODO
+                                    // Resolve role ID via name
+                                    message.channel.guild.roles.map(function(role) {
+                                        if(role.name === model.attributes.role_name) {
+                                            roleId = role.id;
+                                        }
+                                    });
+
+                                    if(roleId) {
+                                        if(message.member.roles.indexOf(roleId) >= 0) {
+                                            continueCommand(command);
+                                            break;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        else {
+                            continueCommand(command);
                         }
 
-                        for(var x in command.params) {
-                            var param = command.params[x];
-                            var value = parts.shift();
+                        function continueCommand(command) {
+                            for(var x in command.params) {
+                                var param = command.params[x];
+                                var value = parts.shift();
 
-                            if(typeof value === 'undefined') {
-                                if(!param.optional) {
-                                    return;
+                                if(typeof value === 'undefined') {
+                                    if(!param.optional) {
+                                        return;
+                                    }
                                 }
+                                else {
+                                    if (x == command.params.length - 1) {
+                                        value += ' ' + parts.join(' ');
+                                    }
+
+                                    value = value.trim();
+
+                                    if(param.mention) {
+                                        value = scope.parseUserMention(value);
+                                    }
+
+                                    if(param.channel) {
+                                        value = scope.parseChannelMention(value);
+                                    }
+                                }
+
+                                args.push(value);
                             }
-                            else {
-                                if (x == command.params.length - 1) {
-                                    value += ' ' + parts.join(' ');
-                                }
 
-                                value = value.trim();
-
-                                if(param.mention) {
-                                    value = scope.parseUserMention(value);
-                                }
-
-                                if(param.channel) {
-                                    value = scope.parseChannelMention(value);
-                                }
-                            }
-
-                            args.push(value);
+                            command.handler.apply(scope, args);
                         }
-
-                        command.handler.apply(scope, args);
                     }
-                }
+                });
             }
         };
 
@@ -275,15 +297,6 @@ bot.addCommand(
                 bot.client.createMessage(message.channel.id, util.format('%s has been unmuted on %s',
                     bot.formatUserMention(userId),
                     bot.formatChannelMention(channelId)));
-            });
-        })
-);
-
-bot.addCommand(
-    new Command('np')
-        .do(function() {
-            exec('osascript -e \'tell application "iTunes" to if player state is playing then "Now Playing: " & name of current track & " - " & artist of current track\'', function(error, stdout, stderr) {
-                
             });
         })
 );
