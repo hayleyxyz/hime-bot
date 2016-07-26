@@ -8,13 +8,39 @@ var moment = require('moment');
 var bookshelf = require('./lib/bookshelf');
 var models = require('./lib/models')(bookshelf);
 var config = require('./config');
-var exec = require('child_process').exec;
+var request = require('request').defaults({ encoding: null });
+var SC = require('node-soundcloud');
+var stream = require('stream');
+var fs = require('fs');
+
+function VoiceSession(bot, channelId) {
+    (function(scope) {
+
+        scope.channelId = channelId;
+        scope.bot = bot;
+        scope.connection = null;
+
+        scope.getConnection = function(callback) {
+            if(!scope.connection) {
+                return scope.bot.client.joinVoiceChannel(scope.channelId);
+            }
+            else {
+                return new Promise(function (resolve, reject) {
+                    resolve(scope.connection);
+                });
+            }
+        };
+
+    })(this);
+}
 
 function Command(trigger) {
     this.trigger = trigger;
     this.params = [ ];
     this.handler = null;
     this.requiresAdmin = false;
+    this.requiresOwner = false;
+    this.descriptionText = '';
 
     this.param = function(name, options) {
         options = options || { };
@@ -37,6 +63,18 @@ function Command(trigger) {
         return this;
     };
 
+    this.owner = function() {
+        this.requiresOwner = true;
+
+        return this;
+    };
+
+    this.description = function(value) {
+        this.descriptionText = value;
+
+        return this;
+    };
+
 }
 
 function HimeBot(token) {
@@ -51,6 +89,25 @@ function HimeBot(token) {
         scope.prefix = '!';
 
         scope.commands = [ ];
+
+        scope.voiceSessions = [ ];
+
+        scope.getVoiceSession = function(serverId) {
+            if(!(serverId in scope.voiceSessions)) {
+                var channelId = null;
+
+                var voiceChannels = scope.client.guilds.get(serverId).channels.filter(function(item) {
+                    return item.type === 'voice';
+                });
+
+                // TODO: Error handling when no voice channels in server
+                if(voiceChannels.length > 0) {
+                    scope.voiceSessions[serverId] = new VoiceSession(scope, voiceChannels[0].id);
+                }
+            }
+
+            return scope.voiceSessions[serverId];
+        };
 
         scope.addCommand = function(command) {
             scope.commands.push(command);
@@ -116,6 +173,17 @@ function HimeBot(token) {
                                 }
                             });
                         }
+                        else if(command.requiresOwner) {
+                            // Hardcoded for now
+                            var ownerIds = [
+                                '159592526498496512', // Luna/Summer/Rose/whatever
+                                '175044949744680970' // yui
+                            ];
+
+                            if(ownerIds.indexOf(message.author.id) >= 0) {
+                                continueCommand(command);
+                            }
+                        }
                         else {
                             continueCommand(command);
                         }
@@ -156,6 +224,25 @@ function HimeBot(token) {
             }
         };
 
+        scope.dispatchCustomCommand = function(message) {
+            if(message.content.charAt(0) === scope.prefix) {
+                var parts = message.content.split(' ');
+                var trigger = parts.shift().substr(1);
+
+                models.CustomCommand.where('server_id', message.channel.guild.id).fetchAll().then(function(rows) {
+                    for (var i in rows.models) {
+                        var model = rows.models[i];
+
+                        if(model.attributes.name === trigger) {
+                            scope.client.createMessage(message.channel.id, model.attributes.content);
+                            return;
+                        }
+                    }
+                });
+
+            }
+        };
+
         scope.events = {
 
             ready: function() {
@@ -172,33 +259,44 @@ function HimeBot(token) {
             },
 
             messageCreate: function(message) {
+                var isDm = (message.channel instanceof Eris.PrivateChannel);
+
                 /*
                  * Save the message in the db
                  */
-                /*
                 var messageRecord = new models.Message({
                     discord_id: message.id,
                     channel_id: message.channel.id,
-                    server_id: message.channel.guild.id,
+                    server_id: message.channel.guild ? message.channel.guild.id : null,
                     member_id: message.author.id,
                     member_username: message.author.username,
-                    member_nickname: message.member.nick,
+                    member_nickname: message.member ? message.member.nick : null,
                     content: message.content,
                     timestamp: moment(message.timestamp).format('Y-MM-DD HH:mm:ss')
                 }).save();
-                */
-
 
                 /*
                  * Print message to console
                  */
-                //console.log(util.format('%s - #%s [%s] %s: %s', message.channel.guild.name, message.channel.name,
-                //    moment(message.timestamp).format('YYYY-MM-DD HH:mm'), message.author.username, message.content));
+                var channelDesc = null;
+
+                if(!isDm) {
+                    channelDesc = util.format('%s - #%s', message.channel.guild.name, message.channel.name);
+                }
+                else {
+                    channelDesc = util.format('@%s', message.channel.recipient.username);
+                }
+
+                console.log(util.format('%s [%s] %s: %s', channelDesc,
+                    moment(message.timestamp).format('YYYY-MM-DD HH:mm'), message.author.username, message.content));
 
                 /*
                  * Handle command in message
                  */
-                scope.dispatchMessageCommand(message);
+                if(!isDm && message.author.id !== scope.client.user.id) {
+                    scope.dispatchMessageCommand(message);
+                    scope.dispatchCustomCommand(message);
+                }
             }
 
         };
@@ -213,11 +311,49 @@ function HimeBot(token) {
 
 var bot = new HimeBot(config.token);
 
+SC.init({
+    id: '9ab5e620c2cfe6d87244ee46a2af90cb',
+    secret: '9d5616ebefa83c28200672aba6be296d',
+    uri: ''
+});
+
+bot.addCommand(
+    new Command('help')
+        .description('Show this help text')
+        .do(function(message) {
+            var response = [ ];
+
+            for(var i in this.commands) {
+                var command = this.commands[i];
+                var paramInfo = [ ];
+
+                for(var x in command.params) {
+                    var opt = command.params[x].name;
+
+                    if(command.params[x].values) {
+                        opt = command.params[x].values.join('|');
+                    }
+
+                    if(command.params[x].optional) {
+                        opt = '[' + opt + ']';
+                    }
+
+                    paramInfo.push(opt);
+                }
+
+                response.push(util.format('`%s%s %s` - %s',  bot.prefix, command.trigger, paramInfo.join(' '), command.descriptionText));
+            }
+
+            bot.client.createMessage(message.channel.id, response.join('\n'));
+        })
+);
+
 bot.addCommand(
     new Command('nick')
         .param('user', { mention: true })
         .param('nick', { optional: true })
         .admin()
+        .description('Change or clear the nickname for a user')
         .do(function(message, userId, nick) {
             this.client.editGuildMember(message.channel.guild.id, userId, { nick: nick });
         })
@@ -226,7 +362,8 @@ bot.addCommand(
 bot.addCommand(
     new Command('game')
         .param('game')
-        .admin()
+        .owner()
+        .description('Change the bot\'s currently displayed playing game')
         .do(function(message, game) {
             this.client.editGame({ name: game });
         })
@@ -237,6 +374,7 @@ bot.addCommand(
         .param('user', { mention: true })
         .param('channel', { channel: true, optional: true })
         .admin()
+        .description('Text-mute a user')
         .do(function(message, userId, channelId) {
             var allowMask = 0;
             var denyMask = 0;
@@ -272,6 +410,7 @@ bot.addCommand(
         .param('user', { mention: true })
         .param('channel', { channel: true, optional: true })
         .admin()
+        .description('Text-unmute a user')
         .do(function(message, userId, channelId) {
             var allowMask = 0;
             var denyMask = 0;
@@ -299,4 +438,235 @@ bot.addCommand(
                     bot.formatChannelMention(channelId)));
             });
         })
+);
+
+bot.addCommand(
+    new Command('vdisallow')
+        .param('user', { mention: true })
+        .admin()
+        .description('Disallow a user from entering all voice channels')
+        .do(function(message, userId, channelId) {
+            var allowMask = 0;
+            var denyMask = 0;
+
+            if(!channelId) {
+                channelId = message.channel.id;
+            }
+
+            var existingPermissions = message.channel.guild.channels.get(channelId).permissionOverwrites.find(function(perm) {
+                return perm.type === 'member' && perm.id === userId;
+            });
+
+            if(existingPermissions) {
+                allowMask = existingPermissions.allow;
+                denyMask = existingPermissions.deny;
+            }
+
+            denyMask |= Eris.Constants.Permissions.voiceConnect;
+            allowMask &= ~Eris.Constants.Permissions.voiceConnect;
+
+            var bot = this;
+
+            var voiceChannels = message.channel.guild.channels.filter(function(item) {
+                return item.type === 'voice';
+            });
+
+            var promises = [ ];
+
+            voiceChannels.map(function(channel) {
+                promises.push(bot.client.editChannelPermission(channel.id, userId, allowMask, denyMask, 'member'));
+            });
+
+            Promise.all(promises).then(function() {
+                bot.client.createMessage(message.channel.id, util.format('%s has been muted on all voice channels!',
+                    bot.formatUserMention(userId)));
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('vallow')
+        .param('user', { mention: true })
+        .admin()
+        .description('Allow a user from entering all voice channels')
+        .do(function(message, userId, channelId) {
+            var allowMask = 0;
+            var denyMask = 0;
+
+            if(!channelId) {
+                channelId = message.channel.id;
+            }
+
+            var existingPermissions = message.channel.guild.channels.get(channelId).permissionOverwrites.find(function(perm) {
+                return perm.type === 'member' && perm.id === userId;
+            });
+
+            if(existingPermissions) {
+                allowMask = existingPermissions.allow;
+                denyMask = existingPermissions.deny;
+            }
+
+            denyMask &= ~Eris.Constants.Permissions.voiceConnect;
+
+            var bot = this;
+
+            var voiceChannels = message.channel.guild.channels.filter(function(item) {
+                return item.type === 'voice';
+            });
+
+            var promises = [ ];
+
+            voiceChannels.map(function(channel) {
+                promises.push(bot.client.editChannelPermission(channel.id, userId, allowMask, denyMask, 'member'));
+            });
+
+            Promise.all(promises).then(function() {
+                bot.client.createMessage(message.channel.id, util.format('%s has been unmuted on all voice channels!',
+                    bot.formatUserMention(userId)));
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('avatar')
+        .param('avatarUrl')
+        .owner()
+        .description('Change the bot\'s avatar')
+        .do(function(message, avatarUrl) {
+            var bot = this;
+
+            request.get(avatarUrl, function (error, response, body) {
+                if(!error && response.statusCode == 200) {
+                    bot.client.editSelf({
+                        avatar: 'data:' + response.headers['content-type'] + ';base64,' + new Buffer(body).toString('base64')
+                    }).catch(function() {
+                        bot.client.createMessage(message.channel.id, 'A Discord API error occurred trying to set that avatar!');
+                    });
+                }
+                else {
+                    bot.client.createMessage(message.channel.id, 'An error occurred trying to get that avatar!');
+                }
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('commands.edit')
+        .param('name')
+        .param('content')
+        .admin()
+        .description('Add a custom command')
+        .do(function(message, name, content) {
+            models.CustomCommand.where('server_id', message.channel.guild.id)
+                .where('name', name)
+                .fetch().then(function(record) {
+                    if(record === null) {
+                        record = new models.CustomCommand();
+                    }
+
+                    record.save({
+                        server_id: message.channel.guild.id,
+                        name: name,
+                        content: content
+                    });
+                });
+        })
+);
+
+bot.addCommand(
+    new Command('commands.delete')
+        .param('name')
+        .admin()
+        .description('Delete a custom command')
+        .do(function(message, name, content) {
+            models.CustomCommand.where('server_id', message.channel.guild.id)
+                .where('name', name)
+                .fetch().then(function(record) {
+
+                if(record) {
+                    record.destroy();
+                }
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('commands.delete')
+        .param('name')
+        .admin()
+        .description('Delete a custom command')
+        .do(function(message, name, content) {
+            models.CustomCommand.where('server_id', message.channel.guild.id)
+                .where('name', name)
+                .fetch().then(function(record) {
+
+                if(record) {
+                    record.destroy();
+                }
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('play')
+        .param('url')
+        .param('channel', { optional: true, channel: true })
+        .admin()
+        .do(function(message, fileOrUrl) {
+            var bot = this;
+            var serverId = message.channel.guild.id;
+
+            var session = bot.getVoiceSession(serverId);
+
+            session.getConnection().then(function(vc) {
+                SC.get('/resolve', { url: fileOrUrl }, function(err, track) {
+                    if ( err ) {
+                        throw err;
+                    } else {
+                        var matches = track.location.match(/\/tracks\/([0-9]+).json/);
+
+                        if(matches) {
+                            var id = matches[1];
+                            var filePath = './storage/soundcloud/' + id + '.mp3';
+
+                            if(fs.existsSync(filePath)) {
+                                vc.playFile(filePath);
+                            }
+                            else {
+                                SC.get('/tracks/' + id + '/streams', function (err, track) {
+                                    var downloadUrl = track.http_mp3_128_url;
+
+                                    request.get(downloadUrl, function (error, response, body) {
+                                        if (!error && response.statusCode == 200) {
+                                            var bufferStream = new stream.PassThrough();
+                                            bufferStream.end(body);
+                                            bufferStream.destroy = function () {
+                                                // NOOP until
+                                                // https://github.com/abalabahaha/eris/pull/33
+                                            };
+
+                                            vc.playStream(bufferStream);
+
+                                            // Write file async so we have it for next time
+                                            fs.writeFile(filePath, body);
+                                        }
+                                        else {
+                                            bot.client.createMessage(message.channel.id, 'An error occurred trying to get that track!');
+                                        }
+                                    });
+                                });
+                            }
+
+                        }
+                    }
+                });
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('play')
+    .do(function () {
+
+    })
 );
