@@ -12,6 +12,8 @@ var request = require('request').defaults({ encoding: null });
 var SC = require('node-soundcloud');
 var stream = require('stream');
 var fs = require('fs');
+var ytdl = require('ytdl-core');
+var URL = require('url');
 
 function VoiceSession(bot, channelId) {
     (function(scope) {
@@ -97,7 +99,7 @@ function HimeBot(token) {
                 var channelId = null;
 
                 var voiceChannels = scope.client.guilds.get(serverId).channels.filter(function(item) {
-                    return item.type === 'voice';
+                    return item.type === 2;
                 });
 
                 // TODO: Error handling when no voice channels in server
@@ -511,7 +513,7 @@ bot.addCommand(
             var bot = this;
 
             var voiceChannels = message.channel.guild.channels.filter(function(item) {
-                return item.type === 'voice';
+                return item.type === 2;
             });
 
             var promises = [ ];
@@ -619,54 +621,108 @@ bot.addCommand(
             var session = bot.getVoiceSession(serverId);
 
             session.getConnection().then(function(vc) {
-                SC.get('/resolve', { url: fileOrUrl }, function(err, track) {
-                    if ( err ) {
-                        throw err;
-                    } else {
-                        var matches = track.location.match(/\/tracks\/([0-9]+).json/);
 
-                        if(matches) {
-                            var id = matches[1];
-                            var filePath = './storage/soundcloud/' + id + '.mp3';
+                if(!fileOrUrl) {
+                    if(!vc.playing) {
+                        vc.resume();
+                    }
+                }
+                else {
+                    var parsed = URL.parse(fileOrUrl);
 
-                            if(fs.existsSync(filePath)) {
-                                vc.playFile(filePath);
-                            }
-                            else {
-                                SC.get('/tracks/' + id + '/streams', function (err, track) {
-                                    var downloadUrl = track.http_mp3_128_url;
+                    if(parsed && parsed.host) {
+                        // YouTube URL
+                        if(parsed.host.match(/(www\.)?youtube.com|(www\.)?youtu.be/i)) {
 
-                                    request.get(downloadUrl, function (error, response, body) {
-                                        if (!error && response.statusCode == 200) {
-                                            var bufferStream = new stream.PassThrough();
-                                            bufferStream.end(body);
-                                            bufferStream.destroy = function () {
-                                                // NOOP until
-                                                // https://github.com/abalabahaha/eris/pull/33
-                                            };
+                            ytdl.getInfo(fileOrUrl, function(err, info) {
+                                var filePath = './storage/youtube/' + info.video_id;
+                                var tmpFilePath = filePath + '.tmp';
 
-                                            vc.playStream(bufferStream);
+                                if(fs.existsSync(filePath)) {
+                                    vc.playFile(filePath);
+                                }
+                                else {
+                                    var stream = ytdl(fileOrUrl);
 
-                                            // Write file async so we have it for next time
-                                            fs.writeFile(filePath, body);
-                                        }
-                                        else {
-                                            bot.client.createMessage(message.channel.id, 'An error occurred trying to get that track!');
+                                    stream.pipe(fs.createWriteStream(tmpFilePath));
+
+                                    stream.on('end', function() {
+                                        if(!fs.existsSync(filePath)) {
+                                            fs.rename(tmpFilePath, filePath);
                                         }
                                     });
-                                });
-                            }
 
+                                    vc.playStream(stream);
+                                }
+                            });
+                        }
+                        else if(parsed.host.match(/(www\.)?soundcloud.com/i)) { // Soundcloud URL
+                            SC.get('/resolve', {url: fileOrUrl}, function (err, track) {
+                                if (err) {
+                                    throw err;
+                                } else {
+                                    var matches = track.location.match(/\/tracks\/([0-9]+).json/);
+
+                                    if (matches) {
+                                        var id = matches[1];
+                                        var filePath = './storage/soundcloud/' + id + '.mp3';
+
+                                        if (fs.existsSync(filePath)) {
+                                            vc.playFile(filePath);
+                                        }
+                                        else {
+                                            SC.get('/tracks/' + id + '/streams', function (err, track) {
+                                                var downloadUrl = track.http_mp3_128_url;
+
+                                                request.get(downloadUrl, function (error, response, body) {
+                                                    if (!error && response.statusCode == 200) {
+                                                        var bufferStream = new stream.PassThrough();
+                                                        bufferStream.end(body);
+
+                                                        vc.playStream(bufferStream);
+
+                                                        // Write file async so we have it for next time
+                                                        fs.writeFile(filePath, body);
+                                                    }
+                                                    else {
+                                                        bot.client.createMessage(message.channel.id, 'An error occurred trying to get that track!');
+                                                    }
+                                                });
+                                            });
+                                        }
+
+                                    }
+                                }
+                            });
                         }
                     }
-                });
+                    else {
+                        // File path
+                        if(fs.existsSync(fileOrUrl)) {
+                            vs.playFile(fileOrUrl);
+                        }
+                        else {
+                            // *shrug*
+                        }
+                    }
+                }
             });
         })
 );
 
 bot.addCommand(
-    new Command('play')
-    .do(function () {
+    new Command('pause')
+        .admin()
+        .do(function (message) {
+            var bot = this;
+            var serverId = message.channel.guild.id;
 
-    })
+            var session = bot.getVoiceSession(serverId);
+
+            session.getConnection().then(function(vc) {
+                if(vc.playing) {
+                    vc.pause();
+                }
+            });
+        })
 );
