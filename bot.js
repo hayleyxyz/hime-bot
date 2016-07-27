@@ -88,7 +88,7 @@ function HimeBot(token) {
          */
         scope.client = new Eris(token);
 
-        scope.prefix = '!';
+        scope.prefix = '.';
 
         scope.commands = [ ];
 
@@ -602,6 +602,43 @@ bot.addCommand(
                 .where('name', name)
                 .fetch().then(function(record) {
 
+                if(record) {
+                    record.destroy();
+                }
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('admins.add')
+        .param('role')
+        .owner()
+        .description('Adds a new admin role for this server')
+        .do(function(message, roleName) {
+            models.ServerAdminRole.where('server_id', message.channel.guild.id)
+                .where('role_name', roleName)
+                .fetch().then(function(record) {
+                if(record === null) {
+                    new models.ServerAdminRole({
+                        server_id: message.channel.guild.id,
+                        role_name: roleName
+                    }).save();
+                }
+            });
+
+
+        })
+);
+
+bot.addCommand(
+    new Command('admins.remove')
+        .param('role')
+        .owner()
+        .description('Removes a admin role for this server')
+        .do(function(message, roleName) {
+            models.ServerAdminRole.where('server_id', message.channel.guild.id)
+                .where('role_name', roleName)
+                .fetch().then(function(record) {
                 if(record) {
                     record.destroy();
                 }
