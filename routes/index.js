@@ -2,8 +2,8 @@ var express = require('express');
 var router = express.Router();
 
 var moment = require('moment');
-var bookshelf = require('../lib/bookshelf');
-var models = require('../lib/models')(bookshelf);
+var bookshelf = require('../bookshelf');
+var models = require('../models')(bookshelf);
 
 /* GET home page. */
 router.get('/', function(req, res, next) {

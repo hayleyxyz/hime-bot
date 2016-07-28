@@ -6,6 +6,10 @@ module.exports = {
 
     token: 'aaaaaa',
 
+    erisOptions: {
+        //userAccount: true
+    },
+
     knexOptions: {
         client: 'sqlite3',
         connection: {
