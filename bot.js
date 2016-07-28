@@ -313,11 +313,7 @@ function HimeBot(token) {
 
 var bot = new HimeBot(config.token);
 
-SC.init({
-    id: '9ab5e620c2cfe6d87244ee46a2af90cb',
-    secret: '9d5616ebefa83c28200672aba6be296d',
-    uri: ''
-});
+SC.init(config.soundcloud);
 
 bot.addCommand(
     new Command('help')

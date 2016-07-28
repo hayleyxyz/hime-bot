@@ -10,7 +10,7 @@
     "bookshelf": "^0.10.0",
     "cookie-parser": "~1.4.3",
     "debug": "~2.2.0",
-    "eris": "kimoi/eris",
+    "eris": "kimoi/eris#dev-sandbox",
     "express": "~4.13.4",
     "jade": "~1.11.0",
     "knex": "^0.11.7",

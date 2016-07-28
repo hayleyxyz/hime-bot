@@ -11,6 +11,12 @@ module.exports = {
         connection: {
             filename: './db.sqlite3'
         }
+    },
+
+    soundcloud: {
+        id: 'CLIENET ID',
+        secret: 'CLIENT SECRET',
+        uri: ''
     }
 
 };
