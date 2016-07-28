@@ -759,3 +759,52 @@ bot.addCommand(
             });
         })
 );
+
+bot.addCommand(
+    new Command('config.edit')
+        .param('key')
+        .param('value', { optional: true })
+        .owner()
+        .description('Set a server setting')
+        .do(function(message, key, value) {
+            models.ServerSetting.where('server_id', message.channel.guild.id)
+                .where('key', key)
+                .fetch().then(function(record) {
+                    if(record === null) {
+                        record = new models.ServerSetting();
+                    }
+
+                    record.save({
+                        server_id: message.channel.guild.id,
+                        key: key,
+                        value_string: value || ''
+                    });
+            });
+        })
+);
+
+bot.addCommand(
+    new Command('config.get')
+        .param('key', { optional: true })
+        .owner()
+        .description('Gets a or all server setting')
+        .do(function(message, key) {
+            var query = models.ServerSetting().where('server_id', message.channel.guild.id);
+
+            if(key) {
+                query = query.where('key', key);
+            }
+
+            query.fetchAll().then(function(rows) {
+                var response = [ ]
+
+                for(var i in rows) {
+
+                }
+
+                bot.client.createMessage(message.channel.id, response.join('\n'));
+            });
+        })
+);
+
+    */
