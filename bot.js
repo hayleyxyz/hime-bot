@@ -40,15 +40,17 @@ class VoiceSession {
 
 class CommandMiddleware {
 
-    handle(bot, message, next) {
-        next();
+    static handle(bot, message) {
+        return true;
     }
 
 }
 
 class SelfGuard extends CommandMiddleware {
 
-
+    static handle(bot, message) {
+        return (bot.user.id === message.user.id);
+    }
 
 }
 
@@ -82,32 +84,9 @@ bot.on('messageCreate', (message) => {
     commands.handle(bot, message);
 });
 
-commands.command('echo', (command) => {
-    command.description = 'Echo something back to the user';
-
-    command.args((args) => {
-        args.argument('phrase');
-    });
-
-    command.handler = (bot, message, phrase) => {
-        bot.createMessage(message.channel.id, phrase);
-    };
-});
-
-commands.command('nick', (command) => {
-    command.description = 'Change a user\'s nickname on the server.';
-
-    command.args((args) => {
-        args.user();
-        args.argument('nick').optional();
-    });
-
-    command.handler = (bot, message, userId, nick) => {
-        bot.editGuildMember(message.channel.guild.id, userId, { nick: nick });
-    };
-});
-
 commands.command('play', (command) => {
+
+    command.middleware.add(SelfGuard);
 
     command.args((args) => {
         args.argument('fileOrUrl');
@@ -144,6 +123,82 @@ commands.command('play', (command) => {
         }).catch(function(e) {
             console.log(e);
         });
+    };
+});
+
+commands.command('enable', (command) => {
+    command.description = 'Enable the bot on this server.';
+
+    command.handler = (bot, message) => {
+        var model = new models.ServerWhitelist().save({
+            server_id: message.channel.guild.id
+        }).then(function() {
+            bot.createMessage(message.channel.id,
+                util.format('Self-bot enabled on **%s**', message.channel.guild.name));
+        });
+    };
+});
+
+commands.command('disable', (command) => {
+    command.description = 'Disable the bot on this server.';
+
+    command.handler = (bot, message) => {
+        var model = new models.ServerWhitelist()
+            .where('server_id', message.channel.guild.id).destroy().then(function() {
+                bot.createMessage(message.channel.id,
+                util.format('Self-bot disabled on **%s**', message.channel.guild.name));
+            });
+    };
+});
+
+commands.command('socks', (command) => {
+    command.description = 'Give socks.';
+
+    command.handler = (bot, message) => {
+        const primaryColours = [
+            'white',
+            'black'
+        ];
+
+        const secondaryColours = [
+            'purple',
+            'red',
+            'yellow',
+            'blue',
+            'turquoise'
+        ];
+
+        const types = [
+            'kneesocks',
+            'thigh highs'
+        ];
+
+        var primaryColour = primaryColours[Math.floor(Math.random() * primaryColours.length)];
+        var secondaryColour = secondaryColours[Math.floor(Math.random() * secondaryColours.length)];
+        var type = types[Math.floor(Math.random() * types.length)];
+        var sockCount = Math.round(Math.random() * 20);
+
+        var userId = message.author.id;
+
+        var model = new models.UserSock().save({
+            user_id: userId,
+            count: sockCount
+        }).then(function() {
+            bookshelf.knex('user_socks').sum('count as total').where('user_id', userId).then((result) => {
+                var total = 0;
+
+                if(result.length > 0) {
+                    total = result[0].total;
+                }
+
+                bot.createMessage(message.channel.id,
+                    util.format('**<@!%s> received %d %s & %s %s! They have %d socks in total.**',
+                    userId, sockCount, primaryColour, secondaryColour, type, total));
+            }).catch((reason) => {
+                console.log(reason);
+            });
+        });
+
     };
 });
 
