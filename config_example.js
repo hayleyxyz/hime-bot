@@ -10,6 +10,10 @@ module.exports = {
         //userAccount: true
     },
 
+    whitelistedChannels: [
+        // channel ids
+    ],
+
     knexOptions: {
         client: 'sqlite3',
         connection: {

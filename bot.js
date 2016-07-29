@@ -107,12 +107,16 @@ bot.on('messageCreate', (message) => {
 
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
-    commands.handle(bot, message);
+    if(config.whitelistedChannels.indexOf(message.channel.id) >= 0) {
+        commands.handle(bot, message);
+    }
 });
 
 var customCommands = new CustomCommandHandler();
 bot.on('messageCreate', (message) => {
-    customCommands.handle(bot, message);
+    if(config.whitelistedChannels.indexOf(message.channel.id) >= 0) {
+        customCommands.handle(bot, message);
+    }
 });
 
 commands.command('play', (command) => {
