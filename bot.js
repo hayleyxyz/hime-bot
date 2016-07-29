@@ -54,6 +54,26 @@ class SelfGuard extends CommandMiddleware {
 
 }
 
+class CustomCommandHandler {
+
+    handle(bot, message) {
+        var parts = message.content.split(' ');
+        var trigger = parts[0].substr(1).toLowerCase();
+
+        models.CustomCommand.fetchAll().then(function(rows) {
+            for (var i in rows.models) {
+                var model = rows.models[i];
+
+                if(model.get('name') === trigger) {
+                    bot.createMessage(message.channel.id, model.get('content'));
+                    return;
+                }
+            }
+        });
+    }
+
+}
+
 var voiceSessions = new Map();
 
 var bot = new Eris(config.token, config.erisOptions);
@@ -82,6 +102,11 @@ bot.on('messageCreate', (message) => {
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
     commands.handle(bot, message);
+});
+
+var customCommands = new CustomCommandHandler();
+bot.on('messageCreate', (message) => {
+    customCommands.handle(bot, message);
 });
 
 commands.command('play', (command) => {
@@ -143,11 +168,49 @@ commands.command('disable', (command) => {
     command.description = 'Disable the bot on this server.';
 
     command.handler = (bot, message) => {
-        var model = new models.ServerWhitelist()
+        var model = models.ServerWhitelist
             .where('server_id', message.channel.guild.id).destroy().then(function() {
                 bot.createMessage(message.channel.id,
                 util.format('Self-bot disabled on **%s**', message.channel.guild.name));
             });
+    };
+});
+
+commands.command('commands.edit', (command) => {
+    command.description = 'Edit a custom command.';
+
+    command.args((args) => {
+        args.argument('name');
+        args.argument('content');
+    });
+
+    command.handler = (bot, message, name, content) => {
+        models.CustomCommand
+            .where('name', name)
+            .fetch().then(function(record) {
+                if(record === null) {
+                    record = new models.CustomCommand();
+                }
+
+                record.save({
+                    name: name,
+                    content: content
+                });
+            });
+    };
+});
+
+commands.command('commands.delete', (command) => {
+    command.description = 'Delete a custom command.';
+
+    command.args((args) => {
+        args.argument('name');
+    });
+
+    command.handler = (bot, message, name, content) => {
+        models.CustomCommand
+            .where('name', name)
+            .destroy();
     };
 });
 

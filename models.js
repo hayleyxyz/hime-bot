@@ -17,6 +17,11 @@ module.exports = function (bookshelf) {
         ServerWhitelist: bookshelf.Model.extend({
             tableName: 'server_whitelist',
             hasTimestamps: true
+        }),
+
+        CustomCommand: bookshelf.Model.extend({
+            tableName: 'custom_commands',
+            hasTimestamps: true
         })
     };
 };
