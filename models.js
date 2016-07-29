@@ -22,6 +22,11 @@ module.exports = function (bookshelf) {
         CustomCommand: bookshelf.Model.extend({
             tableName: 'custom_commands',
             hasTimestamps: true
+        }),
+
+        ServerSettings: bookshelf.Model.extend({
+            tableName: 'server_settings',
+            hasTimestamps: true
         })
     };
 };

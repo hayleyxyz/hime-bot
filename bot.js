@@ -75,32 +75,50 @@ commands.command('play', (command) => {
         var serverId = message.channel.guild.id;
         var session = null;
 
-        if(!voiceSessions.has(serverId)) {
-            var voiceChannels = bot.guilds.get(serverId).channels.filter(function(item) {
-                return item.type === 2;
+
+        new Promise((resolve, reject) => {
+            if(!voiceSessions.has(serverId)) {
+                models.ServerSettings
+                    .where('name', 'voiceChannelId')
+                    .where('server_id', serverId)
+                    .fetch().then(function(record) {
+                        if(record) {
+                            var voiceChannels = bot.guilds.get(serverId).channels.filter(function(item) {
+                                return item.id === record.get('value');
+                            });
+                        }
+                        else {
+                            var voiceChannels = bot.guilds.get(serverId).channels.filter(function(item) {
+                                return item.type === 2;
+                            });
+                        }
+
+                        if(voiceChannels.length > 0) {
+                            session = new VoiceSession(bot, voiceChannels[0].id);
+                            voiceSessions.set(serverId, voiceSessions);
+                        }
+                        else {
+                            throw new Error('No voice channels in server!');
+                        }
+
+                        resolve(session);
+                    });
+            }
+            else {
+                session = voiceSessions.get(serverId);
+                resolve(session);
+            }
+        }).then((session) => {
+            session.getConnection().then((vc) => {
+                if(fs.existsSync(fileOrUrl)) {
+                    vc.playFile(fileOrUrl);
+                }
+                else {
+                    console.error('File does not exist: ', fileOrUrl);
+                }
+            }).catch(function(e) {
+                console.log(e);
             });
-
-            if(voiceChannels.length > 0) {
-                session = new VoiceSession(bot, voiceChannels[0].id);
-                voiceSessions.set(serverId, voiceSessions);
-            }
-            else {
-                throw new Error('No voice channels in server!');
-            }
-        }
-        else {
-            session = voiceSessions.get(serverId);
-        }
-
-        session.getConnection().then((vc) => {
-            if(fs.existsSync(fileOrUrl)) {
-                vc.playFile(fileOrUrl);
-            }
-            else {
-                console.error('File does not exist: ', fileOrUrl);
-            }
-        }).catch(function(e) {
-            console.log(e);
         });
     };
 });
@@ -178,6 +196,64 @@ commands.command('commands.delete', (command) => {
         models.CustomCommand
             .where('name', name)
             .destroy();
+    };
+});
+
+commands.command('config.edit', (command) => {
+    command.description = 'Edit a server config.';
+
+    command.guards.add(ownerGuard);
+
+    command.args((args) => {
+        args.argument('name');
+        args.argument('value');
+    });
+
+    command.handler = (bot, message, name, value) => {
+        var serverId = message.channel.guild.id;
+
+        models.ServerSettings
+            .where('name', name)
+            .where('server_id', serverId)
+            .fetch().then(function(record) {
+                if(record === null) {
+                    record = new models.ServerSettings();
+                }
+
+                record.save({
+                    name: name,
+                    server_id: serverId,
+                    value: value
+                });
+            });
+    };
+});
+
+commands.command('config.get', (command) => {
+    command.description = 'Get a server config.';
+
+    command.guards.add(ownerGuard);
+
+    command.args((args) => {
+        args.argument('name');
+    });
+
+    command.handler = (bot, message, name) => {
+        var serverId = message.channel.guild.id;
+
+        models.ServerSettings
+            .where('name', name)
+            .where('server_id', serverId)
+            .fetch().then(function(record) {
+                if(record) {
+                    bot.createMessage(message.channel.id,
+                        util.format('Value: %s', record.get('value')));
+                }
+                else {
+                    bot.createMessage(message.channel.id,
+                        util.format('No config value found for key: %s', name));
+                }
+            });
     };
 });
 
