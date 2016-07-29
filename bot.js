@@ -15,6 +15,8 @@ const bookshelf = require('./bookshelf')(config);
 const models = require('./models')(bookshelf);
 const SC = require('node-soundcloud');
 const fs = require('fs');
+const moment = require('moment');
+const numeral = require('numeral');
 
 //SC.init(config.soundcloud);
 
@@ -266,6 +268,33 @@ commands.command('socks', (command) => {
             });
         });
 
+    };
+});
+
+commands.command('stats', (command) => {
+    command.description = 'Get stats for user.';
+
+    command.args((args) => {
+        args.user().optional();
+    });
+
+    command.handler = (bot, message, userId) => {
+        if(!userId) {
+            userId = message.author.id;
+        }
+
+        bookshelf.knex('messages').count('id as count').max('timestamp as last_posted').where('member_id', userId).then((result) => {
+            var count = 0;
+            var lastPosted = 'never';
+
+            if(result.length > 0) {
+                count = result[0].count;
+                lastPosted = moment(result[0].last_posted).format('dddd, MMMM Do YYYY, h:mm:ss a');
+            }
+
+            bot.createMessage(message.channel.id,
+                util.format('<@%s>: Messages: %s, last message: %s', userId, numeral(count).format('0,0'), lastPosted));
+        });
     };
 });
 
