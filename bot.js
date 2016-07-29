@@ -17,68 +17,12 @@ const SC = require('node-soundcloud');
 const fs = require('fs');
 const moment = require('moment');
 const numeral = require('numeral');
+const ChannelWhitelistGuard = require('./lib/Guards/ChannelWhitelistGuard');
+const OwnerGuard = require('./lib/Guards/OwnerGuard');
+const CustomCommandHandler = require('./lib/CustomCommandHandler');
+const VoiceSession = require('./lib/VoiceSession');
 
 //SC.init(config.soundcloud);
-
-class VoiceSession {
-
-    constructor(bot, channelId) {
-        this.bot = bot;
-        this.channelId = channelId;
-        this.connection = null;
-    }
-
-    getConnection() {
-        if(this.connection === null) {
-            return this.bot.joinVoiceChannel(this.channelId);
-        }
-        else {
-            return new Promise((resolve, reject) => {
-                resolve(this.connection);
-            });
-        }
-    }
-}
-
-class CommandMiddleware {
-
-    static handle(bot, message) {
-        return true;
-    }
-
-}
-
-class SelfGuard extends CommandMiddleware {
-
-    static handle(bot, message) {
-        return (bot.user.id === message.user.id);
-    }
-
-}
-
-class CustomCommandHandler {
-
-    handle(bot, message) {
-        if(message.content.substr(0, 1) !== '.') {
-            return;
-        }
-
-        var parts = message.content.split(' ');
-        var trigger = parts[0].substr(1).toLowerCase();
-
-        models.CustomCommand.fetchAll().then(function(rows) {
-            for (var i in rows.models) {
-                var model = rows.models[i];
-
-                if(model.get('name') === trigger) {
-                    bot.createMessage(message.channel.id, model.get('content'));
-                    return;
-                }
-            }
-        });
-    }
-
-}
 
 var voiceSessions = new Map();
 
@@ -96,8 +40,8 @@ bot.on('ready', () => {
     console.log();
 });
 
-bot.on('error', () => {
-    console.log(arguments);
+bot.on('error', (e) => {
+    console.log(e);
 });
 
 var logger = new MessageLogger(models);
@@ -105,23 +49,23 @@ bot.on('messageCreate', (message) => {
     logger.handle(bot, message);
 });
 
+var channelWhitelistGuard = new ChannelWhitelistGuard(models);
+var ownerGuard = new OwnerGuard(config.ownerUserIds);
+
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
-    if(config.whitelistedChannels.indexOf(message.channel.id) >= 0) {
-        commands.handle(bot, message);
-    }
+    commands.handle(bot, message);
 });
 
-var customCommands = new CustomCommandHandler();
+var customCommands = new CustomCommandHandler(models);
+customCommands.guards.add(channelWhitelistGuard);
 bot.on('messageCreate', (message) => {
-    if(config.whitelistedChannels.indexOf(message.channel.id) >= 0) {
-        customCommands.handle(bot, message);
-    }
+    customCommands.handle(bot, message);
 });
 
 commands.command('play', (command) => {
 
-    command.middleware.add(SelfGuard);
+    command.guards.add(channelWhitelistGuard);
 
     command.args((args) => {
         args.argument('fileOrUrl');
@@ -162,32 +106,43 @@ commands.command('play', (command) => {
 });
 
 commands.command('enable', (command) => {
-    command.description = 'Enable the bot on this server.';
+    command.description = 'Enable the bot on this channel.';
+
+    command.guards.add(ownerGuard);
+
+    command.args((args) => {
+        args.channel().optional();
+    });
 
     command.handler = (bot, message) => {
-        var model = new models.ServerWhitelist().save({
-            server_id: message.channel.guild.id
+        var model = new models.ChannelWhitelist().save({
+            channel_id: message.channel.id
         }).then(function() {
             bot.createMessage(message.channel.id,
-                util.format('Self-bot enabled on **%s**', message.channel.guild.name));
+                util.format('Self-bot enabled on **%s**', Utils.formatChannelMention(message.channel.id)));
         });
     };
 });
 
 commands.command('disable', (command) => {
-    command.description = 'Disable the bot on this server.';
+    command.description = 'Disable the bot on this channel.';
+
+    command.guards.add(ownerGuard);
+    command.guards.add(channelWhitelistGuard);
 
     command.handler = (bot, message) => {
-        var model = models.ServerWhitelist
-            .where('server_id', message.channel.guild.id).destroy().then(function() {
+        var model = models.ChannelWhitelist
+            .where('channel_id', message.channel.id).destroy().then(function() {
                 bot.createMessage(message.channel.id,
-                util.format('Self-bot disabled on **%s**', message.channel.guild.name));
+                    util.format('Self-bot disabled on **%s**', Utils.formatChannelMention(message.channel.id)));
             });
     };
 });
 
 commands.command('commands.edit', (command) => {
     command.description = 'Edit a custom command.';
+
+    command.guards.add(channelWhitelistGuard);
 
     command.args((args) => {
         args.argument('name');
@@ -213,6 +168,8 @@ commands.command('commands.edit', (command) => {
 commands.command('commands.delete', (command) => {
     command.description = 'Delete a custom command.';
 
+    command.guards.add(channelWhitelistGuard);
+
     command.args((args) => {
         args.argument('name');
     });
@@ -226,6 +183,8 @@ commands.command('commands.delete', (command) => {
 
 commands.command('socks', (command) => {
     command.description = 'Give socks.';
+
+    command.guards.add(channelWhitelistGuard);
 
     command.handler = (bot, message) => {
         const primaryColours = [
@@ -278,6 +237,8 @@ commands.command('socks', (command) => {
 commands.command('stats', (command) => {
     command.description = 'Get stats for user.';
 
+    command.guards.add(channelWhitelistGuard);
+
     command.args((args) => {
         args.user().optional();
     });
@@ -304,6 +265,8 @@ commands.command('stats', (command) => {
 
 commands.command('game', (command) => {
     command.description = 'Set current playing game.';
+
+    command.guards.add(channelWhitelistGuard);
 
     command.args((args) => {
         args.argument('game');

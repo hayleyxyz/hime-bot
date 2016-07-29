@@ -14,8 +14,8 @@ module.exports = function (bookshelf) {
             hasTimestamps: true
         }),
 
-        ServerWhitelist: bookshelf.Model.extend({
-            tableName: 'server_whitelist',
+        ChannelWhitelist: bookshelf.Model.extend({
+            tableName: 'channel_whitelist',
             hasTimestamps: true
         }),
 

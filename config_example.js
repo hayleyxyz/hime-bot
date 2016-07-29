@@ -10,8 +10,8 @@ module.exports = {
         //userAccount: true
     },
 
-    whitelistedChannels: [
-        // channel ids
+    ownerUserIds: [
+        // user ids
     ],
 
     knexOptions: {
