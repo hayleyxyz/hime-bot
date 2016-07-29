@@ -213,7 +213,7 @@ commands.command('commands.delete', (command) => {
         args.argument('name');
     });
 
-    command.handler = (bot, message, name, content) => {
+    command.handler = (bot, message, name) => {
         models.CustomCommand
             .where('name', name)
             .destroy();
@@ -295,6 +295,18 @@ commands.command('stats', (command) => {
             bot.createMessage(message.channel.id,
                 util.format('<@%s>: Messages: %s, last message: %s', userId, numeral(count).format('0,0'), lastPosted));
         });
+    };
+});
+
+commands.command('game', (command) => {
+    command.description = 'Set current playing game.';
+
+    command.args((args) => {
+        args.argument('game');
+    });
+
+    command.handler = (bot, message, game) => {
+        bot.editGame({ name: game });
     };
 });
 
