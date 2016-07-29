@@ -57,6 +57,10 @@ class SelfGuard extends CommandMiddleware {
 class CustomCommandHandler {
 
     handle(bot, message) {
+        if(message.content.substr(0, 1) !== '.') {
+            return;
+        }
+
         var parts = message.content.split(' ');
         var trigger = parts[0].substr(1).toLowerCase();
 
