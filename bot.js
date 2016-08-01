@@ -20,6 +20,7 @@ const ChannelWhitelistGuard = require('./lib/Guards/ChannelWhitelistGuard');
 const UserWhitelistGuard = require('./lib/Guards/UserWhitelistGuard');
 const CustomCommandHandler = require('./lib/CustomCommandHandler');
 const VoiceSession = require('./lib/VoiceSession');
+const querystring = require('querystring');
 
 var voiceSessions = new Map();
 
@@ -30,8 +31,18 @@ bot.on('ready', () => {
 
     console.log('Servers:');
 
-    bot.guilds.forEach(function(server) {
+    bot.guilds.forEach((server) => {
         console.log('\t' + server.name);
+
+        server.channels.forEach((channel) => {
+            knex(constants.TABLE_CHANNELS).insert({
+                channel_id: channel.id,
+                server_id: server.id,
+                name: channel.name,
+                created_at: knex.fn.now(),
+                updated_at: knex.fn.now()
+            });
+        });
     });
 
     console.log();
@@ -119,6 +130,19 @@ commands.command('stats', (command) => {
                         numeral(count).format('0,0'),
                         firstPosted));
             });
+    };
+
+});
+
+commands.command('logs', (command) => {
+
+    command.handler = (bot, message) => {
+        var url = util.format('%s/logs/%s?%s',
+            config.webUrl,
+            message.channel.guild.id,
+            querystring.stringify({ channel: message.channel.id }));
+
+        bot.createMessage(message.channel.id, url);
     };
 
 });

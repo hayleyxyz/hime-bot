@@ -6,6 +6,8 @@ module.exports = {
 
     token: 'aaaaaa',
 
+    webUrl: 'http://localhost:3000',
+
     erisOptions: {
         //userAccount: true
     },

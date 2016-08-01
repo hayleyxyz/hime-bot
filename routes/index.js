@@ -19,7 +19,7 @@ function presentMessage(row) {
     };
 }
 
-router.get('/:serverId/logs/:channelId', function(req, res, next) {
+router.get('/logs/:serverId', function(req, res, next) {
     var parsedDate = moment(req.query.date, 'D MMMM, YYYY');
 
     if(!parsedDate.isValid()) {
@@ -28,23 +28,42 @@ router.get('/:serverId/logs/:channelId', function(req, res, next) {
 
     var selectedDate = parsedDate.format('D MMMM, YYYY');
 
+    var selectedChannelId = req.query.channel;
+    if(!selectedChannelId) {
+        selectedChannelId = req.params.serverId;
+    }
+
     knex(constants.TABLE_MESSAGES)
-        .where('server_id', req.params.serverId)
-        .where('channel_id', req.params.channelId)
-        .whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
+        .where('channel_id', selectedChannelId)
+        //.whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
         .orderBy('timestamp', 'desc')
         .then((result) => {
             var messages = result.map(row => presentMessage(row));
 
             knex(constants.TABLE_MESSAGES)
                 .select(knex.raw('date(timestamp) as date'))
-                .where('server_id', req.params.serverId)
-                .where('channel_id', req.params.channelId)
+                .where('channel_id', selectedChannelId)
                 .groupByRaw('date(timestamp)')
                 .then((result) => {
                     var dates = result.map(row => row.date);
 
-                    res.render('index', { title: '111', messages: messages, dates: dates, selectedDate: selectedDate });
+                    knex(constants.TABLE_MESSAGES)
+                        .select('channels.name', knex.raw('cast(messages.channel_id as char(50)) as channel_id'))
+                        .leftJoin('channels', 'channels.channel_id', '=', 'messages.channel_id')
+                        .where('messages.server_id', req.params.serverId)
+                        .groupBy('messages.channel_id')
+                        .then((result) => {
+
+                            var channels = result.map(row => {
+                                return { id: row.channel_id,
+                                    display: '#' + row.name || row.channel_id
+                                };
+                            });
+
+                            res.render('index', { title: 'Logs', messages, dates, selectedDate, channels, selectedChannelId });
+                        });
+
+
                 });
         });
 });

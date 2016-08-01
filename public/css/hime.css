@@ -15,3 +15,7 @@
 #header .ui.main.menu .item {
     border-radius: 0px;
 }
+
+.message .description p {
+    white-space: pre-line;
+}
