@@ -33,10 +33,13 @@ router.get('/logs/:serverId', function(req, res, next) {
         selectedChannelId = req.params.serverId;
     }
 
+    var serverId = req.serverId;
+
     knex(constants.TABLE_MESSAGES)
         .where('channel_id', selectedChannelId)
-        //.whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
+        .whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
         .orderBy('timestamp', 'desc')
+        .orderBy('discord_id', 'desc')
         .then((result) => {
             var messages = result.map(row => presentMessage(row));
 
@@ -60,7 +63,7 @@ router.get('/logs/:serverId', function(req, res, next) {
                                 };
                             });
 
-                            res.render('index', { title: 'Logs', messages, dates, selectedDate, channels, selectedChannelId });
+                            res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId });
                         });
 
 
