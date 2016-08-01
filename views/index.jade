@@ -11,11 +11,16 @@ block content
         .column
             h1 Logs
 
-            .ui.items
+            form.ui.form(method='get')
+                .field
+                    label Logs for date
+                    input.datepicker(type=text, placeholder='Select date', data-dates=dates, name='date', value=selectedDate)
+
+            .ui.items.messages
                 each message in messages
                     .ui.item.message
-                        .meta
-                            span.author= message.author_name
-                            span.timestamp= message.timestamp
-
-                        .body= message.content
+                        .content
+                            .header= message.username_nick
+                            .meta= message.formatted_time
+                            .description
+                                p= message.content

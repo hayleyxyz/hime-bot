@@ -1,36 +1,51 @@
 var express = require('express');
 var router = express.Router();
 
-var moment = require('moment');
-var bookshelf = require('../bookshelf');
-var models = require('../models')(bookshelf);
+const moment = require('moment');
+const config = require('../config');
+const knex = require('knex')(config.knexOptions);
+const constants = require('../constants');
+const util = require('util');
 
-/* GET home page. */
-router.get('/', function(req, res, next) {
-    res.render('index', { title: 'Express' });
-});
+function presentMessage(row) {
+
+    var username_nick = row.member_nickname ? util.format('%s (%s)', row.member_nickname, row.member_username) :
+        row.member_username;
+
+    return {
+        username_nick,
+        formatted_time: moment(row.timestamp).format('H:m'),
+        content: row.content
+    };
+}
 
 router.get('/:serverId/logs/:channelId', function(req, res, next) {
-  new models.Message({
-          server_id: req.params.serverId,
-          channel_id: req.params.channelId
-      })
-      .fetch()
-      .then(function(models) {
-          var messages = [ ];
+    var parsedDate = moment(req.query.date, 'D MMMM, YYYY');
+    
+    if(!parsedDate.isValid()) {
+        parsedDate = moment();
+    }
 
-          if(models.length > 0) {
-              models.map(function (item) {
-                  messages.push({
-                      author_name: item.attributes.member_nickname || item.attributes.member_username,
-                      timestamp: item.attributes.timestamp,
-                      content: item.attributes.content
-                  });
-              });
-          }
+    var selectedDate = parsedDate.format('D MMMM, YYYY');
 
-          res.render('index', { title: '111', messages: messages });
-      });
+    knex(constants.TABLE_MESSAGES)
+        .where('server_id', req.params.serverId)
+        .where('channel_id', req.params.channelId)
+        .whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
+        .then((result) => {
+            var messages = result.map(row => presentMessage(row));
+
+            knex(constants.TABLE_MESSAGES)
+                .select(knex.raw('date(timestamp) as date'))
+                .where('server_id', req.params.serverId)
+                .where('channel_id', req.params.channelId)
+                .groupByRaw('date(timestamp)')
+                .then((result) => {
+                    var dates = result.map(row => row.date);
+
+                    res.render('index', { title: '111', messages: messages, dates: dates, selectedDate: selectedDate });
+                });
+        });
 });
 
 module.exports = router;
