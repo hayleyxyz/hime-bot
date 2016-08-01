@@ -21,7 +21,7 @@ function presentMessage(row) {
 
 router.get('/:serverId/logs/:channelId', function(req, res, next) {
     var parsedDate = moment(req.query.date, 'D MMMM, YYYY');
-    
+
     if(!parsedDate.isValid()) {
         parsedDate = moment();
     }
@@ -32,6 +32,7 @@ router.get('/:serverId/logs/:channelId', function(req, res, next) {
         .where('server_id', req.params.serverId)
         .where('channel_id', req.params.channelId)
         .whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
+        .orderBy('timestamp', 'desc')
         .then((result) => {
             var messages = result.map(row => presentMessage(row));
 
