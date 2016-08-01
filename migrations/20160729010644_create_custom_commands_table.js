@@ -2,8 +2,10 @@
 
 exports.up = function(knex, Promise) {
     return knex.schema.createTable('custom_commands', function (table) {
+        table.charset('utf8mb4');
+
         table.increments();
-        table.string('name');
+        table.string('name', 50);
         table.text('content');
         table.timestamps();
 

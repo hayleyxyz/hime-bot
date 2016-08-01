@@ -9,6 +9,11 @@ module.exports = function (bookshelf) {
             hasTimestamps: true
         }),
 
+        MessageAttachment: bookshelf.Model.extend({
+            tableName: 'message_attachments',
+            hasTimestamps: true
+        }),
+
         UserSock: bookshelf.Model.extend({
             tableName: 'user_socks',
             hasTimestamps: true

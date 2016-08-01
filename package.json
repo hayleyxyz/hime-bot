@@ -16,6 +16,7 @@
     "knex": "^0.11.7",
     "moment": "^2.14.1",
     "morgan": "~1.7.0",
+    "mysql": "^2.11.1",
     "node-soundcloud": "0.0.5",
     "numeral": "^1.5.3",
     "request": "^2.74.0",

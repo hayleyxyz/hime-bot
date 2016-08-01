@@ -18,7 +18,7 @@ const fs = require('fs');
 const moment = require('moment');
 const numeral = require('numeral');
 const ChannelWhitelistGuard = require('./lib/Guards/ChannelWhitelistGuard');
-const OwnerGuard = require('./lib/Guards/OwnerGuard');
+const UserWhitelistGuard = require('./lib/Guards/UserWhitelistGuard');
 const CustomCommandHandler = require('./lib/CustomCommandHandler');
 const VoiceSession = require('./lib/VoiceSession');
 
@@ -50,7 +50,7 @@ bot.on('messageCreate', (message) => {
 });
 
 var channelWhitelistGuard = new ChannelWhitelistGuard(models);
-var ownerGuard = new OwnerGuard(config.ownerUserIds);
+var ownerGuard = new UserWhitelistGuard(config.userIds);
 
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
@@ -352,5 +352,14 @@ commands.command('game', (command) => {
         bot.editGame({ name: game });
     };
 });
+
+commands.command('test', (command) => {
+    command.guards.add(Promise.);
+
+    command.handler = (bot, message, game) => {
+        bot.createMessage(message.channel.id, 'aaaa');
+    };
+});
+
 
 bot.connect();

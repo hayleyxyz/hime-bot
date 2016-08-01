@@ -1,11 +1,13 @@
 
 exports.up = function(knex, Promise) {
     return knex.schema.createTable('messages', function (table) {
+        table.charset('utf8mb4');
+
         table.increments();
-        table.string('discord_id');
-        table.string('channel_id');
-        table.string('server_id');
-        table.string('member_id');
+        table.bigInteger('discord_id');
+        table.bigInteger('channel_id');
+        table.bigInteger('server_id');
+        table.bigInteger('member_id');
         table.string('member_username');
         table.string('member_nickname');
         table.text('content');
