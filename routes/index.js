@@ -33,7 +33,7 @@ router.get('/logs/:serverId', function(req, res, next) {
         selectedChannelId = req.params.serverId;
     }
 
-    var serverId = req.serverId;
+    var serverId = req.params.serverId;
 
     knex(constants.TABLE_MESSAGES)
         .where('channel_id', selectedChannelId)
