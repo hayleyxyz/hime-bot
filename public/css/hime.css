@@ -16,6 +16,15 @@
     border-radius: 0px;
 }
 
+.message .header time {
+    margin-left: .5em;
+    font-size: .6em;
+    font-weight: normal;
+    line-height: 1em;
+    color: rgba(0,0,0,.6);
+    vertical-align: middle;
+}
+
 .message .description p {
     white-space: pre-line;
 }

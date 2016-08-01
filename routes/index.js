@@ -14,6 +14,7 @@ function presentMessage(row) {
 
     return {
         username_nick,
+        datetime: moment(row.timestamp).format(),
         formatted_time: moment(row.timestamp).format('H:m'),
         content: row.content
     };

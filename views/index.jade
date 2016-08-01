@@ -31,6 +31,6 @@ block content
                         .ui.item.message
                             .content
                                 .header= message.username_nick
-                                .meta= message.formatted_time
+                                    time(datetime=message.datetime)= message.formatted_time
                                 .description
                                     p= message.content
