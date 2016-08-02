@@ -7,19 +7,6 @@ const knex = require('knex')(config.knexOptions);
 const constants = require('../constants');
 const util = require('util');
 
-function presentMessage(row) {
-
-    var username_nick = row.member_nickname ? util.format('%s (%s)', row.member_nickname, row.member_username) :
-        row.member_username;
-
-    return {
-        username_nick,
-        datetime: moment(row.timestamp).format(),
-        formatted_time: moment(row.timestamp).format('H:m'),
-        content: row.content
-    };
-}
-
 router.get('/logs/:serverId', function(req, res, next) {
     var parsedDate = moment(req.query.date, 'D MMMM, YYYY');
 
@@ -36,40 +23,55 @@ router.get('/logs/:serverId', function(req, res, next) {
 
     var serverId = req.params.serverId;
 
-    knex(constants.TABLE_MESSAGES)
+    var searchTerm = req.query.search;
+
+    var messagesQuery = knex(constants.TABLE_MESSAGES)
         .where('channel_id', selectedChannelId)
-        .whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'))
         .orderBy('timestamp', 'desc')
-        .orderBy('discord_id', 'desc')
-        .then((result) => {
-            var messages = result.map(row => presentMessage(row));
+        .orderBy('discord_id', 'desc');
 
-            knex(constants.TABLE_MESSAGES)
-                .select(knex.raw('date(timestamp) as date'))
-                .where('channel_id', selectedChannelId)
-                .groupByRaw('date(timestamp)')
-                .then((result) => {
-                    var dates = result.map(row => row.date);
+    if(searchTerm) {
+        messagesQuery = messagesQuery.where('content', 'LIKE', '%' + searchTerm + '%');
+    }
+    else {
+        messagesQuery = messagesQuery.whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'));
+    }
 
-                    knex(constants.TABLE_MESSAGES)
-                        .select('channels.name', knex.raw('cast(messages.channel_id as char(50)) as channel_id'))
-                        .leftJoin('channels', 'channels.channel_id', '=', 'messages.channel_id')
-                        .where('messages.server_id', req.params.serverId)
-                        .groupBy('messages.channel_id')
-                        .then((result) => {
+    var datesQuery = knex(constants.TABLE_MESSAGES)
+        .select(knex.raw('date(timestamp) as date'))
+        .where('channel_id', selectedChannelId)
+        .groupByRaw('date(timestamp)');
 
-                            var channels = result.map(row => {
-                                return { id: row.channel_id,
-                                    display: '#' + row.name || row.channel_id
-                                };
-                            });
-
-                            res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId });
-                        });
+    var channelsQuery = knex(constants.TABLE_MESSAGES)
+        .select('channels.name', knex.raw('cast(messages.channel_id as char(50)) as channel_id'))
+        .leftJoin('channels', 'channels.channel_id', '=', 'messages.channel_id')
+        .where('messages.server_id', serverId)
+        .groupBy('messages.channel_id');
 
 
-                });
+    Promise.all([ messagesQuery, datesQuery, channelsQuery ]).then((values) => {
+        var messages = values[0].map(row => {
+            var username_nick = row.member_nickname ? util.format('%s (%s)', row.member_nickname, row.member_username) :
+                row.member_username;
+
+            return {
+                username_nick,
+                datetime: moment(row.timestamp).format(),
+                formatted_time: moment(row.timestamp).format(searchTerm ? 'D MMMM, YYYY, H:mm' : 'H:mm'),
+                content: row.content
+            };
         });
+
+        var dates = values[1].map(row => row.date);
+
+        var channels = values[2].map(row => {
+            return { id: row.channel_id,
+                display: '#' + row.name || row.channel_id
+            };
+        });
+
+        res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId, searchTerm });
+    });
 });
 
 module.exports = router;

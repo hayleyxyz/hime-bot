@@ -57,6 +57,10 @@ bot.on('messageCreate', (message) => {
     logger.handle(bot, message);
 });
 
+bot.on('messageUpdate', (message, oldMessage) => {
+    logger.handleUpdate(bot, message);
+});
+
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
     commands.handle(bot, message);
@@ -143,6 +147,14 @@ commands.command('logs', (command) => {
             querystring.stringify({ channel: message.channel.id }));
 
         bot.createMessage(message.channel.id, url);
+    };
+
+});
+
+commands.command('shrug', (command) => {
+
+    command.handler = (bot, message) => {
+        bot.createMessage(message.channel.id, '¯\\_(ツ)_/¯');
     };
 
 });

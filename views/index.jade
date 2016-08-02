@@ -12,15 +12,21 @@ block content
             h1 Logs
 
             form.ui.filter.form(method='get')
-                .two.fields
+                .three.fields
                     .field
                         label Logs for date
-                        input.datepicker(type=text, placeholder='Select date', data-dates=dates, name='date', value=selectedDate)
+                        input.datepicker(type='text', placeholder='Select date', data-dates=dates, name='date',
+                            value=selectedDate, disabled=!!searchTerm)
                     .field
                         label Channel
                         select.ui.dropdown(name='channel')
                             each channel in channels
                                 option(value=channel.id, selected=(channel.id == selectedChannelId))= channel.display
+                    .field
+                        label Search
+                        .ui.action.input
+                            input(type='text', placeholder='Search text', name='search', value=searchTerm)
+                            button.ui.button Search
 
             if messages.length === 0
                 .ui.message
@@ -33,4 +39,5 @@ block content
                                 .header= message.username_nick
                                     time(datetime=message.datetime)= message.formatted_time
                                 .description
-                                    p= message.content
+                                    p
+                                        span= message.content
