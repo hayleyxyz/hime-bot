@@ -24,6 +24,8 @@ const querystring = require('querystring');
 
 var voiceSessions = new Map();
 
+var logger = new MessageLogger(knex);
+
 var bot = new Eris(config.token, config.erisOptions);
 
 bot.on('ready', () => {
@@ -34,15 +36,11 @@ bot.on('ready', () => {
     bot.guilds.forEach((server) => {
         console.log('\t' + server.name);
 
-        server.channels.forEach((channel) => {
-            knex(constants.TABLE_CHANNELS).insert({
-                channel_id: channel.id,
-                server_id: server.id,
-                name: channel.name,
-                created_at: knex.fn.now(),
-                updated_at: knex.fn.now()
-            });
-        });
+        logger.batchInsertChannels(server.channels);
+    });
+
+    bot.users.forEach((user) => {
+        logger.insertUpdateUser(user);
     });
 
     console.log();
@@ -52,13 +50,12 @@ bot.on('error', (e) => {
     console.log(e);
 });
 
-var logger = new MessageLogger(knex);
 bot.on('messageCreate', (message) => {
     logger.handle(bot, message);
 });
 
 bot.on('messageUpdate', (message, oldMessage) => {
-    logger.handleUpdate(bot, message);
+    logger.handle(bot, message);
 });
 
 var commands = new CommandHandler();
@@ -66,6 +63,15 @@ bot.on('messageCreate', (message) => {
     commands.handle(bot, message);
 });
 
+bot.on('userUpdate', (user) => {
+    logger.insertUpdateUser(user);
+});
+
+bot.on('guildMemberAdd', (user) => {
+    logger.insertUpdateUser(user);
+});
+
+/*
 commands.command('enable', (command) => {
     command.description = 'Enable the bot on this channel.';
 
@@ -75,9 +81,7 @@ commands.command('enable', (command) => {
 
     command.handler = (bot, message) => {
         knex(constants.TABLE_CHANNEL_WHITELIST).insert({
-            channel_id: message.channel.id,
-            created_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            channel_id: message.channel.id
         }).then(() => {
             bot.createMessage(message.channel.id,
                 util.format('Self-bot enabled on **%s**', Utils.formatChannelMention(message.channel.id)));
@@ -95,48 +99,14 @@ commands.command('disable', (command) => {
     command.handler = (bot, message) => {
         knex(constants.TABLE_CHANNEL_WHITELIST)
             .where('channel_id', message.channel.id)
-            .del()
+            .delete()
             .then(() => {
                 bot.createMessage(message.channel.id,
                     util.format('Self-bot disabled on **%s**', Utils.formatChannelMention(message.channel.id)));
             });
     };
 });
-
-commands.command('stats', (command) => {
-
-    command.args((args) => {
-        args.user().optional();
-    });
-
-    command.handler = (bot, message, userId) => {
-        if(!userId) {
-            userId = message.author.id;
-        }
-
-        knex(constants.TABLE_MESSAGES)
-            .count('id as count')
-            .min('timestamp as first_posted')
-            .where('server_id', message.channel.guild.id)
-            .where('member_id', userId)
-            .then((result) => {
-                var count = 0;
-                var firstPosted = 'Never';
-
-                if(result.length > 0) {
-                    count = result[0].count;
-                    firstPosted = moment(result[0].first_posted).format('YYYY-MM-DD HH:mm');
-                }
-
-                bot.createMessage(message.channel.id,
-                    util.format('%s: %s total messages since %s',
-                        Utils.formatUserMention(userId),
-                        numeral(count).format('0,0'),
-                        firstPosted));
-            });
-    };
-
-});
+*/
 
 commands.command('logs', (command) => {
 

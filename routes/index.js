@@ -26,24 +26,26 @@ router.get('/logs/:serverId', function(req, res, next) {
     var searchTerm = req.query.search;
 
     var messagesQuery = knex(constants.TABLE_MESSAGES)
+        .select('messages.*', knex.raw('COUNT(messages.message_id) as copies_count'))
         .where('channel_id', selectedChannelId)
         .orderBy('timestamp', 'desc')
-        .orderBy('discord_id', 'desc');
+        .orderBy('message_id', 'desc')
+        .groupBy('message_id');
 
     if(searchTerm) {
         messagesQuery = messagesQuery.where('content', 'LIKE', '%' + searchTerm + '%');
     }
     else {
-        messagesQuery = messagesQuery.whereRaw('date(timestamp) = ?', parsedDate.format('Y-MM-DD'));
+        messagesQuery = messagesQuery.whereRaw('DATE(FROM_UNIXTIME(messages.timestamp / 1000)) = ?', parsedDate.format('Y-MM-DD'));
     }
 
     var datesQuery = knex(constants.TABLE_MESSAGES)
-        .select(knex.raw('date(timestamp) as date'))
+        .select(knex.raw('DATE(FROM_UNIXTIME(messages.timestamp / 1000)) as date'))
         .where('channel_id', selectedChannelId)
-        .groupByRaw('date(timestamp)');
+        .groupByRaw('DATE(timestamp)');
 
     var channelsQuery = knex(constants.TABLE_MESSAGES)
-        .select('channels.name', knex.raw('cast(messages.channel_id as char(50)) as channel_id'))
+        .select('channels.name', knex.raw('messages.channel_id'))
         .leftJoin('channels', 'channels.channel_id', '=', 'messages.channel_id')
         .where('messages.server_id', serverId)
         .groupBy('messages.channel_id');
@@ -51,8 +53,8 @@ router.get('/logs/:serverId', function(req, res, next) {
 
     Promise.all([ messagesQuery, datesQuery, channelsQuery ]).then((values) => {
         var messages = values[0].map(row => {
-            var username_nick = row.member_nickname ? util.format('%s (%s)', row.member_nickname, row.member_username) :
-                row.member_username;
+            var username_nick = row.user_nick ? util.format('%s (%s)', row.user_nick, row.user_username) :
+                row.user_username;
 
             return {
                 username_nick,
@@ -70,8 +72,13 @@ router.get('/logs/:serverId', function(req, res, next) {
             };
         });
 
+        console.log(messages);
+
         res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId, searchTerm });
-    });
+    })
+    .catch((e) => {
+        throw e;
+    })
 });
 
 module.exports = router;

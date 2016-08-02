@@ -1,12 +1,12 @@
 
 exports.up = function(knex, Promise) {
-    return knex.schema.createTable('message_attachments', function (table) {
+    return knex.schema.createTable('message_attachments', function(table) {
         table.charset('utf8mb4');
         
-        table.increments();
-        table.bigInteger('message_id').index();
+        table.string('message_id', 20).index();
+        table.string('filename');
+        table.integer('size');
         table.string('url');
-        table.timestamps();
     });
 };
 
