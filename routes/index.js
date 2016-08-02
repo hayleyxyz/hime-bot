@@ -26,7 +26,9 @@ router.get('/logs/:serverId', function(req, res, next) {
     var searchTerm = req.query.search;
 
     var messagesQuery = knex(constants.TABLE_MESSAGES)
-        .select('messages.*', knex.raw('COUNT(messages.message_id) as copies_count'))
+        .select('messages.*', knex.raw('COUNT(messages.message_id) as copies_count'),
+            knex.raw('GROUP_CONCAT(message_attachments.url) as attachment_urls'))
+        .leftJoin('message_attachments', 'message_attachments.message_id', '=', 'messages.message_id')
         .where('channel_id', selectedChannelId)
         .orderBy('timestamp', 'desc')
         .orderBy('message_id', 'desc')
@@ -60,7 +62,8 @@ router.get('/logs/:serverId', function(req, res, next) {
                 username_nick,
                 datetime: moment(row.timestamp).format(),
                 formatted_time: moment(row.timestamp).format(searchTerm ? 'D MMMM, YYYY, H:mm' : 'H:mm'),
-                content: row.content
+                content: row.clean_content,
+                attachment_urls: row.attachment_urls ? row.attachment_urls.split(',') : null
             };
         });
 
@@ -71,8 +74,6 @@ router.get('/logs/:serverId', function(req, res, next) {
                 display: '#' + row.name || row.channel_id
             };
         });
-
-        console.log(messages);
 
         res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId, searchTerm });
     })

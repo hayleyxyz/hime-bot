@@ -32,7 +32,7 @@ block content
                 .ui.message
                     p No logs to display for this date!
             else
-                .ui.items.messages
+                .ui.divided.items.messages
                     each message in messages
                         .ui.item.message
                             .content
@@ -41,3 +41,8 @@ block content
                                 .description
                                     p
                                         span= message.content
+
+                                        if message.attachment_urls
+                                            each url in message.attachment_urls
+                                                p
+                                                    a(href=url, target='_blank')= url
