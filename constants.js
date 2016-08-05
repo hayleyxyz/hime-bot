@@ -8,6 +8,7 @@ module.exports = {
     TABLE_MESSAGE_ATTACHMENTS: 'message_attachments',
     TABLE_MESSAGE_MENTIONS: 'message_mentions',
     TABLE_CHANNELS: 'channels',
-    TABLE_USERS: 'users'
+    TABLE_USERS: 'users',
+    TABLE_CUSTOM_COMMANDS: 'custom_commands'
 
 };

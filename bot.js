@@ -6,6 +6,7 @@
 
 const Eris = require('eris');
 const CommandHandler = require('./lib/CommandHandler');
+var CustomCommandHandler = require('./lib/CustomCommandHandler');
 const MessageLogger = require('./lib/MessageLogger');
 const config = require('./config');
 const util = require('util');
@@ -18,15 +19,19 @@ const numeral = require('numeral');
 const constants = require('./constants');
 const ChannelWhitelistGuard = require('./lib/Guards/ChannelWhitelistGuard');
 const UserWhitelistGuard = require('./lib/Guards/UserWhitelistGuard');
-const CustomCommandHandler = require('./lib/CustomCommandHandler');
-const VoiceSession = require('./lib/VoiceSession');
+const Database = require('./lib/Database');
 const querystring = require('querystring');
 
-var voiceSessions = new Map();
 
-var logger = new MessageLogger(knex);
+var db = new Database(knex);
+var logger = new MessageLogger(db);
 
-var bot = new Eris(config.token, config.erisOptions);
+var userGuard = new UserWhitelistGuard([
+    '175044949744680970',
+    '163017409521909760'
+]);
+
+var bot = new Eris(process.env.DISCORD_TOKEN || config.token, config.erisOptions);
 
 bot.on('ready', () => {
     console.log('Username: ' + bot.user.username);
@@ -36,11 +41,11 @@ bot.on('ready', () => {
     bot.guilds.forEach((server) => {
         console.log('\t' + server.name);
 
-        logger.batchInsertChannels(server.channels);
+        db.batchInsertChannels(server.channels);
     });
 
     bot.users.forEach((user) => {
-        logger.insertUpdateUser(user);
+        db.insertUpdateUser(user);
     });
 
     console.log();
@@ -63,50 +68,29 @@ bot.on('messageCreate', (message) => {
     commands.handle(bot, message);
 });
 
+var customCommands = new CustomCommandHandler(db);
+bot.on('messageCreate', (message) => {
+    customCommands.handle(bot, message);
+});
+
+
 bot.on('userUpdate', (user) => {
-    logger.insertUpdateUser(user);
+    if(user.discriminator) {
+        db.insertUpdateUser(user);
+    }
+    else {
+        console.log(user);
+    }
 });
 
 bot.on('guildMemberAdd', (user) => {
-    logger.insertUpdateUser(user);
+    if(user.discriminator) {
+        db.insertUpdateUser(user);
+    }
+    else {
+        console.log(user);
+    }
 });
-
-/*
-commands.command('enable', (command) => {
-    command.description = 'Enable the bot on this channel.';
-
-    command.args((args) => {
-        args.channel().optional();
-    });
-
-    command.handler = (bot, message) => {
-        knex(constants.TABLE_CHANNEL_WHITELIST).insert({
-            channel_id: message.channel.id
-        }).then(() => {
-            bot.createMessage(message.channel.id,
-                util.format('Self-bot enabled on **%s**', Utils.formatChannelMention(message.channel.id)));
-        });
-    };
-});
-
-commands.command('disable', (command) => {
-    command.description = 'Disable the bot on this channel.';
-
-    command.args((args) => {
-        args.channel().optional();
-    });
-
-    command.handler = (bot, message) => {
-        knex(constants.TABLE_CHANNEL_WHITELIST)
-            .where('channel_id', message.channel.id)
-            .delete()
-            .then(() => {
-                bot.createMessage(message.channel.id,
-                    util.format('Self-bot disabled on **%s**', Utils.formatChannelMention(message.channel.id)));
-            });
-    };
-});
-*/
 
 commands.command('logs', (command) => {
 
@@ -121,10 +105,17 @@ commands.command('logs', (command) => {
 
 });
 
-commands.command('shrug', (command) => {
+commands.command('commands.edit', (command) => {
 
-    command.handler = (bot, message) => {
-        bot.createMessage(message.channel.id, '¯\\_(ツ)_/¯');
+    command.guards.add(userGuard);
+
+    command.args((args) => {
+        args.argument('name');
+        args.argument('content');
+    });
+
+    command.handler = (bot, message, name, content) => {
+        db.insertUpdateCustomCommand(name, content);
     };
 
 });
