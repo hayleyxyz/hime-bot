@@ -25,6 +25,10 @@
     vertical-align: middle;
 }
 
+.message .header .ui.label {
+    margin-left: .5em;
+}
+
 .message .description p {
     white-space: pre-line;
 }

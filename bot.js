@@ -72,6 +72,10 @@ bot.on('messageUpdate', (message, oldMessage) => {
     logger.handle(bot, message);
 });
 
+bot.on('messageDelete', (message) => {
+    db.updateMessageDeleted(message.id);
+});
+
 var commands = new CommandHandler();
 bot.on('messageCreate', (message) => {
     commands.handle(bot, message);

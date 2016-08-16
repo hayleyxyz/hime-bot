@@ -41,11 +41,6 @@ router.get('/logs/:serverId', function(req, res, next) {
         messagesQuery = messagesQuery.whereRaw('DATE(FROM_UNIXTIME(messages.timestamp / 1000)) = ?', parsedDate.format('Y-MM-DD'));
     }
 
-    var datesQuery = knex(constants.TABLE_MESSAGES)
-        .select(knex.raw('DATE(FROM_UNIXTIME(messages.timestamp / 1000)) as date'))
-        .where('channel_id', selectedChannelId)
-        .groupByRaw('DATE(timestamp)');
-
     var channelsQuery = knex(constants.TABLE_MESSAGES)
         .select('channels.name', knex.raw('messages.channel_id'))
         .leftJoin('channels', 'channels.channel_id', '=', 'messages.channel_id')
@@ -53,7 +48,7 @@ router.get('/logs/:serverId', function(req, res, next) {
         .groupBy('messages.channel_id');
 
 
-    Promise.all([ messagesQuery, datesQuery, channelsQuery ]).then((values) => {
+    Promise.all([ messagesQuery, channelsQuery ]).then((values) => {
         var messages = values[0].map(row => {
             var username_nick = row.user_nick ? util.format('%s (%s)', row.user_nick, row.user_username) :
                 row.user_username;
@@ -63,19 +58,18 @@ router.get('/logs/:serverId', function(req, res, next) {
                 datetime: moment(row.timestamp).format(),
                 formatted_time: moment(row.timestamp).format(searchTerm ? 'D MMMM, YYYY, H:mm' : 'H:mm'),
                 content: row.clean_content,
-                attachment_urls: row.attachment_urls ? row.attachment_urls.split(',') : null
+                attachment_urls: row.attachment_urls ? row.attachment_urls.split(',') : null,
+                deleted_at: row.deleted_at
             };
         });
 
-        var dates = values[1].map(row => row.date);
-
-        var channels = values[2].map(row => {
+        var channels = values[1].map(row => {
             return { id: row.channel_id,
                 display: '#' + row.name || row.channel_id
             };
         });
 
-        res.render('index', { serverId, messages, dates, selectedDate, channels, selectedChannelId, searchTerm });
+        res.render('index', { serverId, messages, selectedDate, channels, selectedChannelId, searchTerm });
     })
     .catch((e) => {
         throw e;

@@ -9,16 +9,6 @@ $(document).ready(function() {
 
         var options = { };
 
-        if(data.dates) {
-            options.disable = [
-                true
-            ];
-
-            data.dates.forEach(function(date) {
-                options.disable.push(new Date(date));
-            });
-        }
-
         options.onClose = function() {
             var form = input.prop('form');
             if(form) {

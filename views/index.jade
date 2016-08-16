@@ -15,7 +15,7 @@ block content
                 .three.fields
                     .field
                         label Logs for date
-                        input.datepicker(type='text', placeholder='Select date', data-dates=dates, name='date',
+                        input.datepicker(type='text', placeholder='Select date', name='date',
                             value=selectedDate, disabled=!!searchTerm)
                     .field
                         label Channel
@@ -38,6 +38,10 @@ block content
                             .content
                                 .header= message.username_nick
                                     time(datetime=message.datetime)= message.formatted_time
+
+                                    if message.deleted_at
+                                        .ui.small.red.label(title='Deleted at ' + message.deleted_at) Deleted
+
                                 .description
                                     p
                                         span= message.content
