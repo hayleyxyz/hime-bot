@@ -3,15 +3,25 @@
  */
 
 const Eris = require('eris');
-const config = require('./config');
-const moment = require('moment');
-const util = require('util');
-const fs = require('fs');
-const knex = require('knex')(config.knexOptions);
 const MessageLogger = require('./lib/MessageLogger');
+const config = require('./config');
+const util = require('util');
+const Utils = require('./lib/Utils');
+const request = require('request');
+const knex = require('knex')(config.knexOptions);
+const fs = require('fs');
+const moment = require('moment');
+const numeral = require('numeral');
+const constants = require('./constants');
+const Database = require('./lib/Database');
 
-var logger = new MessageLogger(knex);
-var bot = new Eris(config.token, config.erisOptions);
+var db = new Database(knex);
+var logger = new MessageLogger(db);
+
+//var serverId = '117436212867760130';
+var channelId = '117436212867760130';
+
+var bot = new Eris(process.env.DISCORD_TOKEN || config.token, config.erisOptions);
 
 bot.on('ready', () => {
     console.log('Username: ' + bot.user.username);
@@ -24,27 +34,36 @@ bot.on('ready', () => {
 
     console.log();
 
-    function getMessages(before) {
-        "use strict";
+    knex(constants.TABLE_MESSAGES)
+        .select('message_id')
+        .where('channel_id', channelId)
+        .groupBy('message_id')
+        .pluck('message_id')
+        .then(existingIds => {
 
-        bot.getMessages('179986759067762688', 100, before).then((messages) => {
-            "use strict";
+            function getMessages(before) {
+                bot.getMessages(channelId, 100, before).then((messages) => {
+                    var lastId = null;
 
-            var lastId = null;
+                    for(var i in messages) {
+                        var message = messages[i];
 
-            for(var i in messages) {
-                var message = messages[i];
+                        if(existingIds.indexOf(message.id) === -1) {
+                            logger.handle(bot, message);
+                        }
 
-                logger.handle(bot, message);
+                        lastId = message.id;
+                    }
 
-                lastId = message.id;
+                    getMessages(lastId);
+                });
             }
 
-            getMessages(lastId);
-        });
-    }
+            getMessages();
 
-    getMessages();
+        });
+}).catch(e => {
+    console.log(e);
 });
 
 bot.on('error', () => {
