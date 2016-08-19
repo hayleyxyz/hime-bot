@@ -2,11 +2,9 @@
  * Created by oscar on 19/07/2016.
  */
 
-"use strict";
-
 const Eris = require('eris');
 const CommandHandler = require('./lib/CommandHandler');
-var CustomCommandHandler = require('./lib/CustomCommandHandler');
+const CustomCommandHandler = require('./lib/CustomCommandHandler');
 const MessageLogger = require('./lib/MessageLogger');
 const config = require('./config');
 const util = require('util');
@@ -23,6 +21,9 @@ const RoleWhitelistGuard = require('./lib/Guards/RoleWhitelistGuard');
 const Database = require('./lib/Database');
 const querystring = require('querystring');
 const CommandArgument = require('./lib/CommandArgument');
+const stream = require('stream');
+const vm = require('vm');
+const Gist = require('./lib/Gist');
 
 var db = new Database(knex);
 var logger = new MessageLogger(db);
@@ -43,14 +44,12 @@ var bot = new Eris(process.env.DISCORD_TOKEN || config.token, config.erisOptions
 bot.on('ready', () => {
     console.log('Username: ' + bot.user.username);
 
-    console.log('Servers:');
+    console.log('Guilds:');
 
-    bot.guilds.forEach((server) => {
-        console.log('\t' + server.name);
+    bot.guilds.forEach((guild) => {
+        console.log('\t' + guild.name);
 
-        console.log(server.roles);
-
-        db.batchInsertChannels(server.channels);
+        db.batchInsertChannels(guild.channels);
     });
 
     bot.users.forEach((user) => {
@@ -279,6 +278,45 @@ commands.command('settings.edit', (command) => {
 
     command.handler = (bot, message, name, value) => {
         db.insertUpdateGuildSetting(message.channel.guild.id, name, value);
+    };
+});
+
+commands.command('js', (command) => {
+
+    command.args((args) => {
+        args.argument('code');
+    });
+
+    command.handler = (bot, message, input) => {
+        var script = vm.createScript(input, {
+            displayErrors: false
+        });
+
+        var context = vm.createContext({
+            Math
+        });
+
+        try {
+            var result = script.runInContext(context, {
+                displayErrors: false,
+                timeout: 5000
+            });
+
+            var formatted = util.inspect(result);
+
+            if (formatted.length > 1600) {
+                Gist.create(options).then(result => {
+                    bot.createMessage(message.channel.id, util.format('```> %s```\n%s', input, result.html_url));
+                });
+            }
+            else {
+                bot.createMessage(message.channel.id, util.format('```> %s\n%s```', input, formatted));
+            }
+        }
+        catch(error) {
+            bot.createMessage(message.channel.id, util.format('```> %s\n%s```', input, error));
+        }
+
     };
 });
 
