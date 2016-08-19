@@ -270,4 +270,16 @@ commands.command('unmute', (command) => {
 
 });
 
+commands.command('settings.edit', (command) => {
+
+    command.args((args) => {
+        args.argument('name');
+        args.argument('value');
+    });
+
+    command.handler = (bot, message, name, value) => {
+        db.insertUpdateGuildSetting(message.channel.guild.id, name, value);
+    };
+});
+
 bot.connect();

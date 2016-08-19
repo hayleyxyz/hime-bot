@@ -9,6 +9,7 @@ module.exports = {
     TABLE_MESSAGE_MENTIONS: 'message_mentions',
     TABLE_CHANNELS: 'channels',
     TABLE_USERS: 'users',
-    TABLE_CUSTOM_COMMANDS: 'custom_commands'
+    TABLE_CUSTOM_COMMANDS: 'custom_commands',
+    TABLE_GUILD_SETTINGS: 'guild_settings'
 
 };
