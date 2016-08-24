@@ -30,6 +30,7 @@ const SC = require('node-soundcloud');
 const http = require('http');
 const https = require('https');
 const xray = require('x-ray')();
+const Danbooru = require('danbooru');
 
 SC.init(config.soundcloud);
 
@@ -48,6 +49,31 @@ var roleGuard = new RoleWhitelistGuard([
 ]);
 
 var bot = new Eris(process.env.DISCORD_TOKEN || config.token, config.erisOptions);
+
+if(process.argv.length > 2 && process.argv[2] === '--dump') {
+    bot.on('ready', () => {
+        var output = {};
+
+        output.user = bot.user;
+        output.guilds = { };
+
+        bot.guilds.forEach(guild => {
+            output.guilds[guild.id] = {
+                id: guild.id,
+                name: guild.name,
+                roles: guild.roles.map(role => role),
+                channels: guild.channels.map(channel => ({ id: channel.id, name: channel.name, type: channel.type }))
+            };
+        });
+
+        console.log(JSON.stringify(output, null, 4));
+
+        bot.disconnect();
+    });
+
+    bot.connect();
+    return;
+}
 
 bot.on('ready', () => {
     console.log('Username: ' + bot.user.username);
@@ -392,6 +418,33 @@ commands.command('play', (command) => {
                 })
             }
         });
+    };
+});
+
+commands.command('booru', (command) => {
+
+    command.args((args) => {
+        args.argument('tags');
+    });
+
+    command.handler = (bot, message, tags) => {
+        if(message.channel.id === '119637372487991297' || message.channel.id === '203522780480667649') {
+            Danbooru.search(tags, function (err, data) {
+                var post = data.random();
+
+                var fileName = post.file_url.split('/').pop();
+                var filePath = './storage/booru/' + fileName;
+                var stream = fs.createWriteStream(filePath);
+
+                post.getLarge().pipe(stream);
+
+                stream.on('finish', () => {
+                    fs.readFile(filePath, function (err, data) {
+                        bot.createMessage(message.channel.id, post.url, {file: data, name: fileName});
+                    });
+                });
+            });
+        }
     };
 });
 
