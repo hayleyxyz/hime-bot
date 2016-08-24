@@ -9,6 +9,7 @@
     "body-parser": "~1.15.1",
     "bookshelf": "^0.10.0",
     "cookie-parser": "~1.4.3",
+    "danbooru": "^1.4.8",
     "debug": "~2.2.0",
     "eris": "abalabahaha/eris#dev",
     "express": "~4.13.4",
@@ -21,6 +22,7 @@
     "numeral": "^1.5.3",
     "request": "^2.74.0",
     "serve-favicon": "~2.3.0",
+    "x-ray": "^2.3.0",
     "ytdl-core": "^0.7.17"
   }
 }

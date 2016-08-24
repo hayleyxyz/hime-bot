@@ -26,6 +26,12 @@ const vm = require('vm');
 const Gist = require('./lib/Gist');
 const ytdl = require('ytdl-core');
 const URL = require('url');
+const SC = require('node-soundcloud');
+const http = require('http');
+const https = require('https');
+const xray = require('x-ray')();
+
+SC.init(config.soundcloud);
 
 var db = new Database(knex);
 var logger = new MessageLogger(db);
@@ -349,8 +355,41 @@ commands.command('play', (command) => {
             var parsedUrl = URL.parse(fileOrUrl);
 
             if(parsedUrl.hostname.match(/^(www\.)?(youtube\.com)|(youtu\.be)$/)) {
-                var stream = ytdl(fileOrUrl);
+                let stream = ytdl(fileOrUrl, { quality: 'lowest' });
+
                 connection.playStream(stream);
+            }
+            else if(parsedUrl.hostname.match(/(www\.)?soundcloud.com/i)) { // Soundcloud URL
+                SC.get('/resolve', {url: fileOrUrl}, function (err, track) {
+                    if (err) {
+                        throw err;
+                    } else {
+                        var matches = track.location.match(/\/tracks\/([0-9]+).json/);
+
+                        if (matches) {
+                            var id = matches[1];
+
+                            SC.get('/tracks/' + id + '/streams', function (err, track) {
+                                if(!err) {
+                                    var downloadUrl = track.http_mp3_128_url;
+
+                                    https.get(downloadUrl, function (response) {
+                                        connection.playStream(response);
+                                    });
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            else if(parsedUrl.hostname.match(/(www\.)?tmbox.net/i)) {
+                xray(fileOrUrl, '.player embed@src')(function(err, src) {
+                    let parsedSrc = URL.parse(src, { parseQueryString: true });
+
+                    https.get(parsedSrc.query.mp3, function (response) {
+                        connection.playStream(response);
+                    });
+                })
             }
         });
     };
