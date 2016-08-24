@@ -24,6 +24,8 @@ const CommandArgument = require('./lib/CommandArgument');
 const stream = require('stream');
 const vm = require('vm');
 const Gist = require('./lib/Gist');
+const ytdl = require('ytdl-core');
+const URL = require('url');
 
 var db = new Database(knex);
 var logger = new MessageLogger(db);
@@ -319,5 +321,40 @@ commands.command('js', (command) => {
 
     };
 });
+
+commands.command('play', (command) => {
+
+    command.args((args) => {
+        args.argument('fileOrUrl');
+    });
+
+    command.handler = (bot, message, fileOrUrl) => {
+        var targetChannelId = message.member.voiceState.channelID;
+
+        if(!targetChannelId) {
+            var voiceChannel = message.channel.guild.channels.find(channel => channel.type === 2 && channel.id !== message.afkChannelID);
+
+            if(!voiceChannel) {
+                throw 'No voice channel available';
+            }
+
+            targetChannelId = voiceChannel.id;
+        }
+
+        bot.joinVoiceChannel(targetChannelId).then(connection => {
+            if(connection.playing) {
+                return;
+            }
+
+            var parsedUrl = URL.parse(fileOrUrl);
+
+            if(parsedUrl.hostname.match(/^(www\.)?(youtube\.com)|(youtu\.be)$/)) {
+                var stream = ytdl(fileOrUrl);
+                connection.playStream(stream);
+            }
+        });
+    };
+});
+
 
 bot.connect();
