@@ -432,11 +432,25 @@ commands.command('booru', (command) => {
             Danbooru.search(tags, function (err, data) {
                 var post = data.random();
 
-                var fileName = post.file_url.split('/').pop();
+                if(!post) {
+                    bot.createMessage(message.channel.id, 'No results found');
+                    return;
+                }
+
+                var fileName = null;
+
+                if(post.file_url) {
+                    fileName = post.file_url.split('/').pop();
+                }
+                else {
+                    bot.createMessage(message.channel.id, 'No results found');
+                    return;
+                }
+
                 var filePath = './storage/booru/' + fileName;
                 var stream = fs.createWriteStream(filePath);
 
-                post.getLarge().pipe(stream);
+                post.get().pipe(stream);
 
                 stream.on('finish', () => {
                     fs.readFile(filePath, function (err, data) {
