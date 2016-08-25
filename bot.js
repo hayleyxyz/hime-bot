@@ -304,6 +304,7 @@ commands.command('unmute', (command) => {
 });
 
 commands.command('settings.edit', (command) => {
+    command.description = 'Edit a bot setting for this server';
 
     command.args((args) => {
         args.argument('name');
@@ -316,6 +317,7 @@ commands.command('settings.edit', (command) => {
 });
 
 commands.command('js', (command) => {
+    command.description = 'Evaluate Javascript code and display the result';
 
     command.args((args) => {
         args.argument('code');
@@ -355,6 +357,7 @@ commands.command('js', (command) => {
 });
 
 commands.command('play', (command) => {
+    command.description = 'Play a resource in a voice channel';
 
     command.args((args) => {
         args.argument('fileOrUrl');
@@ -422,6 +425,7 @@ commands.command('play', (command) => {
 });
 
 commands.command('booru', (command) => {
+    command.description = 'Post a random image from Danbooru, by tags';
 
     command.args((args) => {
         args.argument('tags');
@@ -460,6 +464,36 @@ commands.command('booru', (command) => {
             });
         }
     };
+});
+
+commands.command('addrole', (command) => {
+    command.description = 'Add a role to a user';
+
+    command.guards.add(new UserWhitelistGuard([
+        '175044949744680970', // Me
+        '163017409521909760', // Simkitty
+        '117435590550618119' // Asstic
+    ]));
+
+    command.args((args) => {
+        args.user();
+        args.argument('role');
+    });
+
+    command.handler = (bot, message, targetUserId, roleName) => {
+        var role = message.channel.guild.roles.find(r => r.name === roleName);
+
+
+        if(role) {
+            var member = message.channel.guild.members.find(m => m.id === targetUserId);
+
+            var roleIds = member.roles;
+            roleIds.push(role.id);
+
+            bot.editGuildMember(message.channel.guild.id, targetUserId, { roles: roleIds });
+        }
+    };
+
 });
 
 
